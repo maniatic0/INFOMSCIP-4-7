@@ -243,9 +243,90 @@ perform_first_question <- function(n_values)
   return(results);
 };
 
-first_n_Values = c(100, 200, 300, 400, 500, 600, 700, 800);
+perform_second_question <- function(f_values)
+{
+  means_cols = c("Error Count Mean", "% Error Count Mean", "Correct Count Mean", 
+                 "% Correct Mean",  "False Positives Count Mean", "% False Positives Count Mean", 
+                 "False Negative Count Mean", "% False Negatives Count Mean");
+  sd_cols = c("Error Count SD", "% Error Count SD", "Correct Count SD", 
+              "% Correct SD",  "False Positives Count SD", "% False Positives SD", 
+              "False Negative Count SD", "% False Negatives Count SD");
+  cols = c(
+    "f", means_cols, sd_cols);
+  results = data.frame(matrix(ncol = length(cols), nrow = length(f_values)));
+  colnames(results) = cols;
+  
+  for(i in 1:length(f_values))
+  {
+    f = f_values[i];
+    result = perform_tests(
+      default_min_size, default_max_size, default_triangle, 
+      default_n, f, default_k, 
+      default_test_size, default_repeat);
+    results[i, "f"] = f;
+    results[i, means_cols] = sapply(result, mean);
+    results[i, sd_cols] = sapply(result, sd);
+    
+    png(sprintf("second/f_%i_boxplot.png", i));
+    boxplot(
+      result["Error Count"], 
+      ylab="Error Count", 
+      main=sprintf(
+        "f=%g mean=%g sd=%g", 
+        f, 
+        results[i, "Error Count Mean"],
+        results[i, "Error Count SD"]
+      )
+    );
+    dev.off();
+  }
+  write.csv(results, file = "second/data.csv")
+  png("second/error_percentage.png")
+  plot(
+    results$f, 
+    results$`% Error Count Mean`, 
+    type='l', col="red", xlab = "f", ylab = "Errors (%)",
+    ylim = c(
+      min(
+        results$`% Error Count Mean`, 
+        results$`% False Positives Count Mean`, 
+        results$`% False Negatives Count Mean`
+      ), 
+      max(
+        results$`% Error Count Mean`, 
+        results$`% False Positives Count Mean`, 
+        results$`% False Negatives Count Mean`
+      )
+    )
+  );
+  points(
+    results$f, 
+    results$`% False Positives Count Mean`, 
+    type='l', col="green");
+  points(
+    results$f, 
+    results$`% False Negatives Count Mean`, 
+    type='l', col="blue");
+  legend("topright", 
+         legend=c(
+           "Errors (%)", 
+           "False Positives (%)",
+           "False Negatives (%)"
+         ), 
+         col=c("red", "green", "blue"),
+         lty=1
+  );
+  dev.off();
+  return(results);
+};
 
-results = perform_first_question(first_n_Values);
+#first_n_Values = c(100, 200, 300, 400, 500, 600, 700, 800);
+
+second_f_values = c(0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3);
+
+#first_results = perform_first_question(first_n_Values);
+
+second_results = perform_second_question(second_f_values);
 
 
 
