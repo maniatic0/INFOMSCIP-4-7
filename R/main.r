@@ -203,8 +203,10 @@ perform_first_question <- function(n_values)
       );
     dev.off();
   }
-  write.csv(results, file = "first/data.csv")
-  png("first/error_percentage.png")
+  
+  write.csv(results, file = "first/data.csv");
+  
+  png("first/error_percentage.png");
   plot(
     results$n, 
     results$`% Error Count Mean`, 
@@ -240,6 +242,32 @@ perform_first_question <- function(n_values)
          lty=1
   );
   dev.off();
+  
+  png("first/correlation.png");
+  cor1 = cor(results$n, results$`% Error Count Mean`);
+  cor2 = cor(results$n, results$`% False Positives Count Mean`);
+  cor3 = cor(results$n, results$`% False Negatives Count Mean`);
+  corrs = c(cor1, cor2, cor3);
+  barplot(
+    corrs, 
+    main="Correlation with n", 
+    names.arg=c(
+      sprintf("Errors (%%)\n%g", cor1), 
+      sprintf("False Positives (%%)\n%g", cor2),  
+      sprintf("False Negatives (%%)\n%g",cor3)
+    ),
+    ylab="Correlation",
+    ylim = c(-1, 1)
+  );
+  dev.off();
+  
+  cor_res = data.frame(matrix(ncol = 3, nrow = length(1)));
+  colnames(cor_res) = 
+    c("Errors (%)", "False Positives (%)", "False Negatives (%)");
+  rownames(cor_res) = c("Correlation with n");
+  cor_res[1,] = corrs;
+  write.csv(cor_res, file = "first/correlation.csv");
+  
   return(results);
 };
 
@@ -280,8 +308,10 @@ perform_second_question <- function(f_values)
     );
     dev.off();
   }
-  write.csv(results, file = "second/data.csv")
-  png("second/error_percentage.png")
+  
+  write.csv(results, file = "second/data.csv");
+  
+  png("second/error_percentage.png");
   plot(
     results$f, 
     results$`% Error Count Mean`, 
@@ -317,14 +347,40 @@ perform_second_question <- function(f_values)
          lty=1
   );
   dev.off();
+  
+  png("second/correlation.png");
+  cor1 = cor(results$f, results$`% Error Count Mean`);
+  cor2 = cor(results$f, results$`% False Positives Count Mean`);
+  cor3 = cor(results$f, results$`% False Negatives Count Mean`);
+  corrs = c(cor1, cor2, cor3);
+  barplot(
+    corrs, 
+    main="Correlation with f", 
+    names.arg=c(
+      sprintf("Errors (%%)\n%g", cor1), 
+      sprintf("False Positives (%%)\n%g", cor2),  
+      sprintf("False Negatives (%%)\n%g",cor3)
+      ),
+    ylab="Correlation",
+    ylim = c(-1, 1)
+  );
+  dev.off();
+  
+  cor_res = data.frame(matrix(ncol = 3, nrow = length(1)));
+  colnames(cor_res) = 
+    c("Errors (%)", "False Positives (%)", "False Negatives (%)");
+  rownames(cor_res) = c("Correlation with f");
+  cor_res[1,] = corrs;
+  write.csv(cor_res, file = "second/correlation.csv");
+  
   return(results);
 };
 
-#first_n_Values = c(100, 200, 300, 400, 500, 600, 700, 800);
+first_n_Values = c(100, 200, 300, 400, 500, 600, 700, 800);
 
 second_f_values = c(0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3);
 
-#first_results = perform_first_question(first_n_Values);
+first_results = perform_first_question(first_n_Values);
 
 second_results = perform_second_question(second_f_values);
 
