@@ -363,7 +363,7 @@ perform_first_question <- function(n_values)
     results[i, means_cols] = sapply(result, mean);
     results[i, sd_cols] = sapply(result, sd);
     
-    png(sprintf("first/n_%i_boxplot.png", n));
+    png(sprintf("first/n_%03i_boxplot.png", n));
     boxplot(
       result["Error Count"], 
       ylab="Error Count", 
@@ -593,7 +593,7 @@ perform_third_question <- function(t_values)
     results[i, means_cols] = sapply(result, mean);
     results[i, sd_cols] = sapply(result, sd);
     
-    png(sprintf("third/t_%i_boxplot.png", i));
+    png(sprintf("third/t_%03i_boxplot.png", i));
     boxplot(
       result["Error Count"], 
       ylab="Error Count", 
@@ -606,11 +606,23 @@ perform_third_question <- function(t_values)
     );
     dev.off();
     
-    png(sprintf("third/t_%i_model.png", i));
+    png(sprintf("third/t_%03i_model.png", i));
     generate_model(
       default_min_size, default_max_size, 
       triangle, 
       default_n, default_f, TRUE, sprintf(" t=%g", t)
+    );
+    
+    angles = get_triangle_angles(triangle) * 180 / pi;
+    alpha_str = sprintf("=%g°, ", angles[1]);
+    beta_str = sprintf("=%g°, ", angles[2]);
+    gamma_str = sprintf("=%g°", angles[3]);
+    title(
+      sub=bquote(
+        alpha ~ .(alpha_str) ~
+          beta ~ .(beta_str) ~ 
+          gamma ~ .(gamma_str)
+        )
     );
     
     dev.off();
@@ -644,7 +656,7 @@ perform_third_question <- function(t_values)
     results$t, 
     results$`% False Negatives Count Mean`, 
     type='l', col="blue");
-  legend("topright", 
+  legend("topleft", 
          legend=c(
            "Errors (%)", 
            "False Positives (%)",
