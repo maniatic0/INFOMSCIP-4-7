@@ -1,5 +1,7 @@
 
 library(class);
+library(rlang);
+library(plotly);
 
 # Utils
 generate_points <- function(n, min_size, max_size) 
@@ -550,21 +552,49 @@ perform_second_question <- function(f_values)
   return(results);
 };
 
-perform_third_question <- function(t_values)
+perform_third_question <- function(b_values, t_values)
 {
+  target_area = default_triangle_decomp[["area"]];
   triangles = list();
-  for(i in 1:length(t_values))
   {
-    t = t_values[i];
-    triangle = generate_triangle_base_height_decomp(default_triangle_decomp, t);
-    triangle = recenter_triangle(triangle, default_min_size, default_max_size);
-    if (triangle_is_inside(triangle, default_min_size, default_max_size))
+    triangle_info = {};
+    triangle_info[["triangle"]] = default_triangle;
+    triangle_info[["b"]] = norm_vector(default_triangle_decomp[["base"]]);
+    triangle_info[["h"]] = norm_vector(default_triangle_decomp[["height"]]);
+    triangle_info[["t"]] = 0;
+    triangles[[1]] = triangle_info;
+  }
+  
+  decompt = duplicate(default_triangle_decomp);
+  
+  iter = 2;
+  for(i in 1:length(b_values))
+  {
+    b = b_values[i];
+    h = target_area * 2 / b;
+    
+    decompt[["base"]] = normalize_vector(decompt[["base"]]) * b;
+    decompt[["height"]] = normalize_vector(decompt[["height"]]) * h;
+    
+    for(j in 1:length(t_values))
     {
-      triangles[[i]] = triangle;
-    }
-    else
-    {
-      break;
+      t = t_values[j];
+      triangle = generate_triangle_base_height_decomp(decompt, t);
+      triangle = recenter_triangle(triangle, default_min_size, default_max_size);
+      if (triangle_is_inside(triangle, default_min_size, default_max_size))
+      {
+        triangle_info = {};
+        triangle_info[["triangle"]] = triangle;
+        triangle_info[["b"]] = b;
+        triangle_info[["h"]] = h;
+        triangle_info[["t"]] = t;
+        triangles[[iter]] = triangle_info;
+        iter = iter + 1;
+      }
+      else
+      {
+        break;
+      }
     }
   }
   
@@ -577,40 +607,45 @@ perform_third_question <- function(t_values)
               "% Correct SD",  "False Positives Count SD", "% False Positives SD", 
               "False Negative Count SD", "% False Negatives Count SD");
   cols = c(
-    "t", means_cols, sd_cols);
+    "t", "Base", "Height", means_cols, sd_cols);
   results = data.frame(matrix(ncol = length(cols), nrow = length(triangles)));
   colnames(results) = cols;
   
   for(i in 1:length(triangles))
   {
-    triangle = triangles[[i]];
-    t = t_values[i];
+    triangle_info = triangles[[i]];
+    triangle = triangle_info[["triangle"]];
+    t = triangle_info[["t"]];
+    b = triangle_info[["b"]];
+    h = triangle_info[["h"]];
     result = perform_tests(
       default_min_size, default_max_size, triangle, 
       default_n, default_f, default_k, 
       default_test_size, default_repeat);
     results[i, "t"] = t;
+    results[i, "Base"] = b;
+    results[i, "Height"] = h;
     results[i, means_cols] = sapply(result, mean);
     results[i, sd_cols] = sapply(result, sd);
     
-    png(sprintf("third/t_%03i_boxplot.png", i));
+    png(sprintf("third/t_%05i_boxplot.png", i));
     boxplot(
       result["Error Count"], 
       ylab="Error Count", 
       main=sprintf(
-        "t=%g mean=%g sd=%g", 
-        t, 
+        "t=%g h=%g b=%g mean=%g sd=%g", 
+        t, h, b,
         results[i, "Error Count Mean"],
         results[i, "Error Count SD"]
       )
     );
     dev.off();
     
-    png(sprintf("third/t_%03i_model.png", i));
+    png(sprintf("third/t_%05i_model.png", i));
     generate_model(
       default_min_size, default_max_size, 
       triangle, 
-      default_n, default_f, TRUE, sprintf(" t=%g", t)
+      default_n, default_f, TRUE, sprintf(" t=%g h=%g b=%g", t, h, b)
     );
     
     angles = get_triangle_angles(triangle) * 180 / pi;
@@ -630,44 +665,165 @@ perform_third_question <- function(t_values)
   
   write.csv(results, file = "third/data.csv");
   
-  png("third/error_percentage.png");
-  plot(
-    results$t, 
-    results$`% Error Count Mean`, 
-    type='l', col="red", xlab = "t", ylab = "Errors (%)",
-    ylim = c(
-      min(
-        results$`% Error Count Mean`, 
-        results$`% False Positives Count Mean`, 
-        results$`% False Negatives Count Mean`
-      ), 
-      max(
-        results$`% Error Count Mean`, 
-        results$`% False Positives Count Mean`, 
-        results$`% False Negatives Count Mean`
+  # Errors % Surface
+  {
+    error_percentage_surface = 
+    as.matrix(
+      cbind(
+        results$t, 
+        results$Height, 
+        results$`% Error Count Mean`
+      )
+    );
+  fig = plot_ly(
+    x=results$t,
+    y=results$Height,
+    z=error_percentage_surface,
+    colorscale='Hot'
+  );
+  
+  fig = fig %>% add_surface(
+    contours = list(
+      x = list(
+        show=TRUE,
+        usecolormap=TRUE,
+        highlightcolor='white',
+        project=list(x=TRUE)
+      ),
+      y = list(
+        show=TRUE,
+        usecolormap=TRUE,
+        highlightcolor='black',
+        project=list(y=TRUE)
+      ),
+      z = list(
+        show=TRUE,
+        usecolormap=TRUE,
+        highlightcolor="#00ff00",
+        project=list(z=TRUE)
       )
     )
   );
-  points(
-    results$t, 
-    results$`% False Positives Count Mean`, 
-    type='l', col="green");
-  points(
-    results$t, 
-    results$`% False Negatives Count Mean`, 
-    type='l', col="blue");
-  legend("topleft", 
-         legend=c(
-           "Errors (%)", 
-           "False Positives (%)",
-           "False Negatives (%)"
-         ), 
-         col=c("red", "green", "blue"),
-         lty=1
-  );
-  dev.off();
   
-  png("third/correlation.png");
+  fig = fig %>% layout(
+    title="Errors (%) Surface",
+    scene = list(
+      xaxis = list(title = "t"),
+      yaxis = list(title = "Height"),
+      zaxis = list(title = "Errors (%)")
+    )
+  );
+  
+  withr::with_dir("third", htmlwidgets::saveWidget(fig, file="error_percentage_surface.html"));
+  }
+  
+  # False Positive Surface
+  {
+    
+    fase_positive_percentage_surface = 
+      as.matrix(
+        cbind(
+          results$t, 
+          results$Height, 
+          results$`% False Positives Count Mean`
+        )
+      );
+    fig = plot_ly(
+      x=results$t,
+      y=results$Height,
+      z=fase_positive_percentage_surface,
+      colorscale='Hot'
+    );
+    
+    fig = fig %>% add_surface(
+      contours = list(
+        x = list(
+          show=TRUE,
+          usecolormap=TRUE,
+          highlightcolor='white',
+          project=list(x=TRUE)
+        ),
+        y = list(
+          show=TRUE,
+          usecolormap=TRUE,
+          highlightcolor='black',
+          project=list(y=TRUE)
+        ),
+        z = list(
+          show=TRUE,
+          usecolormap=TRUE,
+          highlightcolor="#00ff00",
+          project=list(z=TRUE)
+        )
+      )
+    );
+    
+    fig = fig %>% layout(
+      title="False Positives Errors (%) Surface",
+      scene = list(
+        xaxis = list(title = "t"),
+        yaxis = list(title = "Height"),
+        zaxis = list(title = "False Positives Errors (%)")
+      )
+    );
+    
+    withr::with_dir("third", htmlwidgets::saveWidget(fig, file="fase_positive_percentage_surface.html"));
+  }
+  
+  # False Negatives Surface
+  {
+    fase_negative_percentage_surface = 
+    as.matrix(
+      cbind(
+        results$t, 
+        results$Height, 
+        results$`% False Negatives Count Mean`
+      )
+    );
+  fig = plot_ly(
+    x=results$t,
+    y=results
+    $Height,
+    z=fase_negative_percentage_surface,
+    colorscale='Hot'
+  );
+  
+  fig = fig %>% add_surface(
+    contours = list(
+      x = list(
+        show=TRUE,
+        usecolormap=TRUE,
+        highlightcolor='white',
+        project=list(x=TRUE)
+      ),
+      y = list(
+        show=TRUE,
+        usecolormap=TRUE,
+        highlightcolor='black',
+        project=list(y=TRUE)
+      ),
+      z = list(
+        show=TRUE,
+        usecolormap=TRUE,
+        highlightcolor="#00ff00",
+        project=list(z=TRUE)
+      )
+    )
+  );
+  
+  fig = fig %>% layout(
+    title="False Negatives Errors (%) Surface",
+    scene = list(
+      xaxis = list(title = "t"),
+      yaxis = list(title = "Height"),
+      zaxis = list(title = "False Negatives Errors (%)")
+    )
+  );
+  
+  withr::with_dir("third", htmlwidgets::saveWidget(fig, file="fase_negative_percentage_surface.html"));
+  }
+  
+  png("third/t_correlation.png");
   cor1 = cor(results$t, results$`% Error Count Mean`);
   cor2 = cor(results$t, results$`% False Positives Count Mean`);
   cor3 = cor(results$t, results$`% False Negatives Count Mean`);
@@ -691,7 +847,33 @@ perform_third_question <- function(t_values)
     c("Errors (%)", "False Positives (%)", "False Negatives (%)");
   rownames(cor_res) = c("Correlation with t");
   cor_res[1,] = corrs;
-  write.csv(cor_res, file = "third/correlation.csv");
+  write.csv(cor_res, file = "third/t_correlation.csv");
+  
+  png("third/height_correlation.png");
+  cor1 = cor(results$Height, results$`% Error Count Mean`);
+  cor2 = cor(results$Height, results$`% False Positives Count Mean`);
+  cor3 = cor(results$Height, results$`% False Negatives Count Mean`);
+  corrs = c(cor1, cor2, cor3);
+  barplot(
+    corrs, 
+    main="Correlation with Height", 
+    names.arg=c(
+      sprintf("Errors (%%)\n%g", cor1), 
+      sprintf("False Positives (%%)\n%g", cor2),  
+      sprintf("False Negatives (%%)\n%g",cor3)
+    ),
+    ylab="Correlation",
+    ylim = c(-1, 1)
+  );
+  dev.off();
+  
+  
+  cor_res = data.frame(matrix(ncol = 3, nrow = length(1)));
+  colnames(cor_res) = 
+    c("Errors (%)", "False Positives (%)", "False Negatives (%)");
+  rownames(cor_res) = c("Correlation with Height");
+  cor_res[1,] = corrs;
+  write.csv(cor_res, file = "third/height_correlation.csv");
   
   return(results);
 };
@@ -700,12 +882,15 @@ first_n_Values = c(100, 200, 300, 400, 500, 600, 700, 800);
 
 second_f_values = c(0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3);
 
-third_t_values = seq(0, 3, length.out=100); # 100 t values from 0 to 4
+third_h_values = seq(
+  default_min_size + 0.01, 
+  default_max_size, 
+  length.out=default_repeat
+);
+third_t_values = seq(0, 3, length.out=default_repeat); # 20 t values from 0 to 4
 
 first_results = perform_first_question(first_n_Values);
 
 second_results = perform_second_question(second_f_values);
 
-third_results = perform_third_question(third_t_values);
-
-
+third_results = perform_third_question(third_h_values, third_t_values);
